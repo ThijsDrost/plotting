@@ -1,0 +1,6 @@
+[submodule "ttools"]
+	path = ttools
+	url = https://github.com/ThijsDrost/ttools
+[submodule "checking"]
+	path = checking
+	url = https://github.com/ThijsDrost/checking

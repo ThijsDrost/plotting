@@ -9,8 +9,8 @@ import matplotlib.pyplot as plt
 from matplotlib.patches import Patch
 import numpy as np
 
-from ttools.itertools import product3
-from ttools.sort import sort_by
+from ttools.ttools.itertools import product3
+from ttools.ttools.sort import sort_by
 
 
 def _linestyles_maker():

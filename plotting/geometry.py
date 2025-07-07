@@ -8,7 +8,7 @@ import attrs
 import sympy
 import numpy as np
 
-from checking._descriptors import Descriptor
+from checking.checking import Descriptor
 
 
 @attrs.define(frozen=True)
