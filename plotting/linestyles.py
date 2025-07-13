@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from typing import Sequence, Hashable, Any, Callable
+from typing import Sequence, Hashable, Any, Callable, Literal
 import warnings
 from copy import deepcopy
 
@@ -8,6 +8,7 @@ import matplotlib.pyplot as plt
 from matplotlib.patches import Patch
 import numpy as np
 
+from .cbar import cbar_norm_colors
 from ttools.ttools.itertools import sim_product
 from ttools.ttools.sort import sort_together
 from checking.checking import Validator
@@ -97,7 +98,7 @@ def linestyle_cycler(index, linestyles: Sequence[tuple[float, ...] | str] =None)
     return linestyles[index % len(linestyles)]
 
 
-def _set_cycler_value(value: Sequence | str | tuple | bool | None, default: Sequence, name: str):
+def _set_cycler_value(value: Sequence | str | tuple | bool | dict | None, default: Sequence, name: str):
     """
     Set the cycler value based on the input `value`. If `value` is `True`, the default cycler is used. If `value` is `False`
     or `None`, a list with a single value 'none' is returned. If `value` is a string or a tuple, it is returned as a single
@@ -105,7 +106,7 @@ def _set_cycler_value(value: Sequence | str | tuple | bool | None, default: Sequ
 
     Parameters
     ----------
-    value : Sequence, str, tuple, bool, or None
+    value : Sequence, str, tuple, bool, dict, or None
         The input value to process.
     default : Sequence
         The default value to use if `value` is True.
@@ -120,7 +121,7 @@ def _set_cycler_value(value: Sequence | str | tuple | bool | None, default: Sequ
     Raises
     -------
     TypeError
-        If `value` is neither a `Sequence`, `dict`, `str`, or `tuple`.
+        If `value` is neither a `Sequence`, `str`, `tuple`, `bool`, `dict`, or None.
     """
     if value is True:
         return default
@@ -128,11 +129,11 @@ def _set_cycler_value(value: Sequence | str | tuple | bool | None, default: Sequ
         return ['none']
     elif isinstance(value, (str, tuple)):
         return [value]
-    elif isinstance(value, dict):  # maybe remove this
+    elif isinstance(value, dict):
         return value
     else:
         if not isinstance(value, Sequence):
-            raise TypeError(f'{name} should be a `Sequence`, `dict`, `str`, or `tuple`, not {type(value)}.')
+            raise TypeError(f'{name} should be a `Sequence`, `str`, `tuple`, `bool`, `dict`, or None, not {type(value)}.')
         return value
 
 
@@ -164,9 +165,8 @@ def linelooks(values: Sequence[Hashable], *, markers: Sequence[str] | bool | str
     A string or a tuple value for `markers`, `linestyles`, or `colors` are interpreted as a single value. All other values are
     interpreted as a sequence of values.
 
-    The marker, linestyle, and color are varied simultaneously. If the number of values is greater than the number of markers,
-    linestyles, or colors, the values are repeated.
-
+    The marker, linestyle, and color are varied simultaneously. If the number of values is greater than the product of
+    the number of markers, linestyles, and colors, combinations are repeated.
     """
     is_sequence = Validator.is_sequence()
 
@@ -243,7 +243,7 @@ def linelooks_sections(*, color_values: Sequence = None, linestyle_values: Seque
                 given_values[value] = cycle[len(given_values) % len(cycle)]
         if len(given_values) > len(cycle):
             warnings.warn(f'Lines will have non unique {name}.')
-        return [given_values[value] for value in values]
+        return [deepcopy(given_values[value]) for value in values]
 
     length = -1
     if color_values is not None:
@@ -428,7 +428,7 @@ def linelooks_sections_plus_legend(*, color_labels: Sequence[str | float | int] 
 
     Returns
     -------
-    tuple
+    tuple[list[dict[str, Any]], dict[str, Any]]
        A tuple containing line kwargs and legend configuration.
    """
     # make the line_kwargs_iter
@@ -565,3 +565,185 @@ def legend_from_linelooks_sections(line_kwargs_iter, /, *, color_labels: Sequenc
 
 class LegendHandle(plt.Line2D):
     pass
+
+
+def _sm_plus_colordict(values, cmap, sort_key, vmin=None, vmax=None, norm='linear'):
+    """
+    Creates a ScalarMappable object with a colormap and a color dictionary for the given values.
+
+    Parameters
+    ----------
+    values : Sequence[Hashable]
+        The values to get the colormap for.
+    cmap : str | Callable
+        A colormap name or a colormap function to use for coloring the lines.
+    vmin : float, optional
+        The minimum value for the colormap normalization. If None, the minimum of `values` is used.
+    vmax : float, optional
+        The maximum value for the colormap normalization. If None, the maximum of `values` is used.
+    norm : str, optional
+        The normalization method to use for the colormap. Can be 'linear' or 'log'. Defaults to 'linear'.
+
+    Returns
+    -------
+    tuple[matplotlib.cm.ScalarMappable, dict[Hashable, tuple[float, float, float, float]]]
+        A ScalarMappable object for the colormap normalization and a dictionary mapping each value to its corresponding RGBA color.
+    """
+    if sort_key is None:
+        sort_key = lambda x: x
+    elif not isinstance(sort_key, Callable):
+        raise TypeError(f'sort_key should be a callable, not {type(sort_key)}.')
+
+    unique_values = list(set(values))
+    new_values = list(map(sort_key, unique_values))
+    key_values, unique_values = sort_together(new_values, unique_values)
+    _, sm = cbar_norm_colors(key_values, cmap, min_value=vmin, max_value=vmax, norm=norm)
+    colors = sm.get_rgba(key_values)
+    color_dict = {val: color for val, color in zip(unique_values, colors)}
+
+    return sm, color_dict
+
+
+def linelooks_with_cmap(values: Sequence[Hashable], *, cmap: str | Callable = "turbo",
+                        markers: Sequence[str] | bool | str = False,
+                        linestyles: Sequence | bool | str = False, sort_key: Callable | None = None, vmin=None,
+                        vmax=None, norm="linear"):
+    """
+    Returns a list of dictionaries with the markers, linestyles, and colors for each value in `values`. If a value or a sequence
+    of values is given for `markers`, `linestyles`, or `colors`, the values are used. If `True` is given, the default cyclers are
+    used. The order of the values is preserved in the output. Same values will have the same linelook.
+
+    Parameters
+    ----------
+    values : Sequence[Hashable]
+        The values to get the linelook for, each value should be hashable.
+    cmap : str | Callable | None, optional
+        A colormap name or a colormap function to use for coloring the lines.
+    markers : Sequence[str], bool, or str, optional
+        Marker values or a flag to use default markers.
+    linestyles : Sequence, bool, or str, optional
+        Linestyle values or a flag to use default linestyles.]
+    sort_key : Callable, optional
+        A function to use for sorting the values. If None, the values are sorted as they are.
+    vmin : float, optional
+        The minimum value for the colormap normalization. If None, the minimum of `values` is used.
+    vmax : float, optional
+        The maximum value for the colormap normalization. If None, the maximum of `values` is used.
+    norm : str, optional
+        The normalization method to use for the colormap. Can be 'linear' or 'log'. Defaults to 'linear'.
+
+    Returns
+    -------
+    sm : tuple[matplotlib.cm.ScalarMappable, list[dict[str, Any]]]
+        A ScalarMappable object for the colormap normalization and a list of dictionaries containing marker, linestyle,
+         and color for each value.
+    """
+    sm, color_dict = _sm_plus_colordict(values, cmap, sort_key, vmin=vmin, vmax=vmax, norm=norm)
+    return sm, linelooks(values, markers=markers, linestyles=linestyles, colors=color_dict)
+
+
+def linelooks_sections_with_cmap(*, color_values: Sequence = None, linestyle_values: Sequence = None,
+                                 marker_values: Sequence = None, markers: Sequence | bool | str | dict = True,
+                                 linestyles: Sequence | bool | str | dict = True, cmap: str | Callable = "turbo",
+                                 sort_key: Callable | None = None, vmin: float | None = None,
+                                 vmax: float | None = None, norm: Literal["lin", "log"] = "lin") \
+        -> tuple[plt.cm.ScalarMappable, list[dict[str, Any]]]:
+    """
+    Creates a legend with linelooks for given labels and values, using a colormap for colors.
+
+    Parameters
+    ----------
+    color_values: Sequence, optional
+        Values for colors. The same value will get the same color.
+    linestyle_values: Sequence, optional
+        Values for linestyles. The same value will get the same linestyle.
+    marker_values: Sequence, optional
+        Values for markers. The same value will get the same marker.
+    markers: Sequence, bool, or str, optional
+        Marker cycler. If True, the default marker cycler is used.
+    linestyles: Sequence, bool, or str, optional
+        Linestyle cycler. If True, the default linestyle cycler is used.
+    cmap: str | Callable, optional
+        A colormap name or a colormap function to use for coloring the lines.
+    sort_key: Callable, optional
+        A function to use for sorting the values. If None, the values are sorted as they are.
+    vmin: float, optional
+        The minimum value for the colormap normalization. If None, the minimum of `color_values` is used.
+    vmax: float, optional
+        The maximum value for the colormap normalization. If None, the maximum of `color_values` is used.
+    norm: Literal["lin", "log"], optional
+        The normalization method to use for the colormap. Can be 'lin' or 'log'. Defaults to 'lin'.
+
+    Returns
+    -------
+    tuple[plt.cm.ScalarMappable, list[dict[str, Any]]]
+        A ScalarMappable object for the colormap normalization and a list of dictionaries containing marker, linestyle,
+         and color for each value.
+    """
+    sm, color_dict = _sm_plus_colordict(color_values, cmap, sort_key, vmin=vmin, vmax=vmax, norm=norm)
+    line_kwargs = linelooks_sections(color_values=color_values, linestyle_values=linestyle_values, marker_values=marker_values,
+                                    markers=markers, linestyles=linestyles, colors=color_dict)
+    return sm, line_kwargs
+
+
+def linelooks_sections_plus_legend_with_cmap(*,
+        color_labels: Sequence[str | float | int] = None, linestyle_labels: Sequence[str | float | int] = None,
+        marker_labels: Sequence[str|float|int] = None, color_values: Sequence = None, linestyle_values: Sequence = None,
+        marker_values: Sequence = None, no_color='k', no_marker=True, no_linestyle=True,
+        color_title=None, marker_title=None, linestyle_title=None, sort=True,
+        cmap: str | Callable = "turbo", sort_key: Callable | None = None, vmin: float | None = None,
+        vmax: float | None = None, norm: Literal["lin", "log"] = "lin") \
+            -> tuple[plt.cm.ScalarMappable, list[dict[str, Any]]]:
+    """
+    Creates a legend with linelooks for given labels and values using a colormap for colors.
+
+    Parameters
+    ----------
+    color_labels : Sequence, optional
+       Labels for colors.
+    linestyle_labels : Sequence, optional
+       Labels for linestyles.
+    marker_labels : Sequence, optional
+       Labels for markers.
+    cmap : Callable, str
+       Values for colors.
+    sort_key: Callable, optional
+        A function to use for sorting the values. If None, the values are sorted as they are.
+    vmin: float, optional
+        The minimum value for the colormap normalization. If None, the minimum of `color_values` is used.
+    vmax: float, optional
+        The maximum value for the colormap normalization. If None, the maximum of `color_values` is used.
+    norm: Literal["lin", "log"], optional
+        The normalization method to use for the colormap. Can be 'lin' or 'log'. Defaults to 'lin'.
+    linestyle_values : Sequence, optional
+       Values for linestyles.
+    marker_values : Sequence, optional
+       Values for markers.
+    no_color : str, optional
+       Default color for missing values.
+    no_marker : bool, optional
+       Default marker for missing values.
+    no_linestyle : bool, optional
+       Default linestyle for missing values.
+    color_title : str, optional
+       Title for the color legend.
+    marker_title : str, optional
+       Title for the marker legend.
+    linestyle_title : str, optional
+       Title for the linestyle legend.
+    sort : bool, optional
+       Whether to sort the labels.
+
+    Returns
+    -------
+    tuple[plt.cm.ScalarMappable, list[dict[str, Any]], dict[str, Any]]
+        A ScalarMappable object for the colormap normalization and a list of dictionaries containing marker, linestyle,
+         and color for each value and legend configuration.
+    """
+    sm, color_dict = _sm_plus_colordict(color_labels, cmap, sort_key, vmin=vmin, vmax=vmax, norm=norm)
+    line_kwargs, legend_kwargs = linelooks_sections_plus_legend(
+        color_values=color_values, linestyle_values=linestyle_values, marker_values=marker_values, no_marker=no_marker,
+        color_labels=color_labels, linestyle_labels=linestyle_labels, marker_labels=marker_labels, no_color=no_color,
+        no_linestyle=no_linestyle, color_title=color_title, marker_title=marker_title, linestyle_title=linestyle_title,
+        sort=sort)
+    return sm, line_kwargs, legend_kwargs
