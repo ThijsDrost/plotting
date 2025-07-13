@@ -483,7 +483,7 @@ def errorrange(xs: np.ndarray | list, ys: np.ndarray | list, *, xerr=None, yerr=
     # for line in ax.lines:
     #     is_sorted(line.get_xdata(), 'xs')
 
-    def set_err(err, values, name):
+    def set_err(err: float | Sequence[float | int] | None, values: list, name: str):
         if err is None:
             return err
 
