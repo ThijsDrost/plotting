@@ -1,7 +1,6 @@
 import matplotlib as mpl
 import matplotlib.pyplot as plt
 import numpy as np
-import matplotlib.colors as mcolors
 
 
 def cbar_norm_colors(values, cbar='turbo', *, min_value=None, max_value=None, norm='linear') -> tuple[np.ndarray, plt.cm.ScalarMappable]:
@@ -28,12 +27,12 @@ def cbar_norm_colors(values, cbar='turbo', *, min_value=None, max_value=None, no
     scalar_mappable: plt.cm.ScalarMappable
     """
     if isinstance(norm, str):
-        if norm == 'linear':
+        if norm.lower() in ('linear', "lin"):
             norm = plt.Normalize(vmin=min_value, vmax=max_value, clip=True)
-        elif norm == 'log':
+        elif norm.lower() in ('lognorm', 'log', 'logarithmic'):
             norm = mpl.colors.LogNorm(vmin=min_value, vmax=max_value, clip=True)
         else:
-            raise ValueError(f'Unknown norm: {norm}')
+            raise ValueError(f'Unknown norm: {norm}. Valid options are "linear" or "log".')
     elif isinstance(norm, plt.Normalize):
         pass
     else:
