@@ -13,9 +13,9 @@ def cbar_norm_colors(values, cmap='turbo', *, min_value=None, max_value=None, no
         The name of the colormap to use
     values: np.ndarray | list | int
         The values use for the colormap, if int, so many values will be created between `min_value` (default=0) and `max_value` (default=1)
-    min_value: float or int
+    min_value: float | None
         The minimum value for the colormap
-    max_value: float or int
+    max_value: float | None
         The maximum value for the colormap
     norm: str or plt.Normalize
         The normalization to use for the colormap. Can be string of 'linear' or 'log', or a plt.Normalize object.
