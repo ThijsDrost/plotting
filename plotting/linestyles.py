@@ -262,7 +262,7 @@ def linelooks_sections(*, color_values: Sequence = None, linestyle_values: Seque
             length = len(marker_values)
 
     if length == -1:
-        raise ValueError('No values given.')
+        raise ValueError('One of `color_values`, `linestyle_values`, or `marker_values` must be provided.')
 
     markers = _set_cycler_value(markers, _marker_list, 'markers')
     linestyles = _set_cycler_value(linestyles, _linestyles, 'linestyles')
