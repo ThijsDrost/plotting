@@ -3,13 +3,13 @@ import matplotlib.pyplot as plt
 import numpy as np
 
 
-def cbar_norm_colors(values, cbar='turbo', *, min_value=None, max_value=None, norm='linear') -> tuple[np.ndarray, plt.cm.ScalarMappable]:
+def cbar_norm_colors(values, cmap='turbo', *, min_value=None, max_value=None, norm='linear') -> tuple[np.ndarray, plt.cm.ScalarMappable]:
     """
     Get the colors and normalizer for a colorbar based on the values and the colormap.
 
     Parameters
     ----------
-    cbar: str
+    cmap: str
         The name of the colormap to use
     values: np.ndarray | list | int
         The values use for the colormap, if int, so many values will be created between `min_value` (default=0) and `max_value` (default=1)
@@ -46,7 +46,7 @@ def cbar_norm_colors(values, cbar='turbo', *, min_value=None, max_value=None, no
         values = np.linspace(min_value, max_value, values)
     normalized_values = norm(values)
 
-    return plt.get_cmap(cbar)(normalized_values), plt.cm.ScalarMappable(norm, plt.get_cmap(cbar))
+    return plt.get_cmap(cmap)(normalized_values), plt.cm.ScalarMappable(norm, plt.get_cmap(cmap))
 
 
 def bounded_cbar(values, cmap='turbo', *, equidistant=True, boundaries=None):
